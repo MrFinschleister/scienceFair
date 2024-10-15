@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            margin: 0;
+            padding: none;
+            overflow-y: hidden;
+        }
+        p {
+            position: block;
+            margin: 1vh;
+            width: 50vw;
+        }
+    </style>
+</head>
+<body onload="render()">
+    <button onclick="inputData()" style="margin: 1vh;">Input Data</button>
+    <div id="content" style="margin: 1vh;">
+        <input type="text" placeholder="Starting Location" id="startLocation">
+        <input type="text" placeholder="Ending Location" id="endLocation">
+        <button onclick="start()">Start</button>
+        <p id="routeOutput"></p>
+        <p id="routeOutputUncompressed" style="font-size: 10px;"></p>
+        <canvas width="600" height="600" id="canvas" style="background-color: gray; position: absolute; right: 5vw; top: 0;"></canvas>
+    </div>
+    <script>
+        let canvas = document.getElementById('canvas')
+        let ctx = canvas.getContext('2d')
+        let nodeSize = 10
+        let currentZ = 0
+        
+        let graph = {
+            n1: {n2: 1, n3: 1,},
+            n2: {n1: 1, n4: 1,},
+            n3: {n1: 1, n4: 1, n5: 5.099,},
+            n4: {n2: 1, n3: 1, n5: 5,},
+            n5: {n3: 5.099, n4: 5, n6: 3,},
+            n6: {n5: 3, n7: 0,},
+            n7: {n6: 0, n8: 2,},
+            n8: {n7: 2,},
+        }
+
+        let locations = {
+            n1: [50, 50, 0],
+            n2: [100, 50, 0],
+            n3: [50, 100, 0],
+            n4: [100, 100, 0],
+            n5: [100, 350, 0],
+            n6: [100, 500, 0],
+            n7: [100, 500, 1],
+            n8: [200, 500, 1],
+        }
+
+        let routeGlobal
+        let finalDistance
+        
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+            let keys = Object.keys(locations)
+            for (var key = 0; key < keys.length; key++) {
+                let node = keys[key]
+                if (locations[node][2] === currentZ) {
+                    let connectedKeys = Object.keys(graph[node])
+                    for (var y = 0; y < connectedKeys.length; y++) {
+                        let connNode = connectedKeys[y]
+                        if (graph[connNode]) {
+                            ctx.strokeStyle = "lightblue"
+                            ctx.beginPath()
+                            ctx.moveTo(locations[node][0] + nodeSize / 2, locations[node][1] + nodeSize / 2)
+                            ctx.lineTo(locations[connNode][0] + nodeSize / 2, locations[connNode][1] + nodeSize / 2)
+                            ctx.stroke()
+                        }
+                    }
+                    ctx.fillStyle = "lightgray"
+                    ctx.fillRect(locations[node][0], locations[node][1], nodeSize, nodeSize)
+                    ctx.fillStyle = "black"
+                    ctx.fillText(node, locations[node][0], locations[node][1] + nodeSize)
+                }    
+            }
+        }
+
+        function start() {
+            let start = document.getElementById('startLocation').value
+            let end = document.getElementById('endLocation').value
+            // Create an object to store the shortest distance from the start node to every other node
+            let distances = {}
+            let routes = {}
+
+            // A set to keep track of all visited nodes
+            let visited = new Set()
+
+            // Get all the nodes of the graph
+            let nodes = Object.keys(graph)
+
+            // Initially, set the shortest distance to every node as Infinity
+            for (let node of nodes) {
+                distances[node] = Infinity
+                routes[node] = []
+            }
+
+            // The distance from the start node to itself is 0
+            distances[start] = 0
+            routes[start].push(start)
+
+            // Loop until all nodes are visited
+            while (nodes.length) {
+                // Sort nodes by distance and pick the closest unvisited node
+                nodes.sort((a, b) => distances[a] - distances[b])
+                let closestNode = nodes.shift()
+
+                // If the shortest distance to the closest node is still Infinity, then remaining nodes are unreachable and we can break
+                if (distances[closestNode] === Infinity) break
+
+                // Mark the chosen node as visited
+                visited.add(closestNode)
+
+                // For each neighboring node of the current node
+                for (let neighbor in graph[closestNode]) {
+                    // If the neighbor hasn't been visited yet
+                    if (!visited.has(neighbor)) {
+                        // Calculate tentative distance to the neighboring node
+                        let newDistance = distances[closestNode] + graph[closestNode][neighbor]
+                        // If the newly calculated distance is shorter than the previously known distance to this neighbor
+                        if (newDistance < distances[neighbor]) {
+                            // Update the shortest distance to this neighbor
+                            distances[neighbor] = newDistance
+                            let newRoute = routes[closestNode].slice(0, routes[closestNode].length)
+                            newRoute.push(neighbor)
+                            routes[neighbor] = newRoute
+                        }
+                    }
+                }
+            }
+
+            // Return the shortest distance from the start node to all nodes
+
+            routeGlobal = routes[end]
+            finalDistance = distances[end]
+            renderRoute()
+        }
+
+        function renderRoute() {
+            let keys = routeGlobal
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+            render()
+            for (var x = 0; x < keys.length - 1; x++) {
+                let selected = keys[x]
+                let selected2 = keys[x+1]
+                if (locations[selected][2] == currentZ && locations[selected2][2] == currentZ) {
+                    ctx.strokeStyle = "blue"
+                    ctx.beginPath()
+                    ctx.moveTo(parseFloat(locations[selected][0]) + nodeSize / 2, parseFloat(locations[selected][1]) + nodeSize / 2)
+                    ctx.lineTo(parseFloat(locations[selected2][0]) + nodeSize / 2, parseFloat(locations[selected2][1]) + nodeSize / 2)
+                    ctx.stroke()
+                }
+            }
+
+            let finalRoute = routeGlobal
+            let output = []
+            
+            let chain = 0
+            let counter = 0
+            let xAxis = false
+            let yAxis = false
+            while (counter < finalRoute.length) {
+                let selected = finalRoute[counter]
+                let next = finalRoute[counter + 1]
+
+                if (next != undefined) {
+                    if (locations[selected][0] === locations[next][0] && locations[selected][2] === locations[next][2] && xAxis && !yAxis) {
+                        chain++
+                    } else if (locations[selected][1] === locations[next][1] && locations[selected][2] === locations[next][2] && yAxis && !xAxis) {
+                        chain++
+                    } else {
+                        if (chain === 0) {
+                            if (locations[selected][0] === locations[next][0] && locations[selected][2] == locations[next][2]) {
+                                xAxis = true
+                            } else if (locations[selected][1] === locations[next][1] && locations[selected][2] == locations[next][2]) {
+                                yAxis = true
+                            }
+                        } else {
+                            chain = 0
+                            xAxis = false
+                            yAxis = false
+                            if (locations[selected][0] === locations[next][0] && locations[selected][2] === locations[next][2]) {
+                                xAxis = true
+                            } else if (locations[selected][1] === locations[next][1] && locations[selected][2] === locations[next][2]) {
+                                yAxis = true
+                            }
+                        }
+                        output.push(selected)
+                    }
+                } else {
+                    chain = 0
+                    xAxis = false
+                    yAxis = false
+                    output.push(selected)
+                }
+                counter++
+            }
+
+            document.getElementById('routeOutput').innerHTML = output.join(" -> ") + " || distance: " + finalDistance
+            document.getElementById('routeOutputUncompressed').innerHTML = finalRoute.join(" -> ") + " || distance: " + finalDistance
+        }
+        
+        function inputData() {
+            let input = prompt("Paste data in here.")
+            graph = JSON.parse(input.split("###")[0])
+            locations = JSON.parse(input.split("###")[1])
+            render()
+        }
+
+        function keyPressed(e) {
+            if (e.target == document.body) {
+                if (e.key == "-") {
+                    currentZ -= 1
+                    render()
+                    if (routeGlobal) {
+                        renderRoute()
+                    }
+                } else if (e.key == "=") {
+                    currentZ += 1
+                    render()
+                    if (routeGlobal) {
+                        renderRoute()
+                    }
+                }
+            }
+        }
+
+        document.body.addEventListener('keydown', keyPressed)
+    </script>
+</body>
+</html>

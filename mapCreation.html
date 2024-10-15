@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            margin: 0;
+            padding: none;
+        }
+
+        input {
+            width: 25vw;
+            margin: 1vh;
+            display: block;
+        }
+
+        label {
+            width: 25vw;
+            margin: 1vh;
+            display: block;
+        }
+
+        hr {
+            width: 25vw;
+            margin: 1vh;
+            margin-top: 2vh;
+            margin-bottom: 2vh;
+            text-align: left;
+        }
+
+        button {
+            margin: 1vh;
+            display: block;
+        }
+
+        p {
+            display: block; 
+            margin: 1vh;
+            width: 25vw;
+        }
+    </style>
+</head>
+<body onbeforeunload="unloadSave()">
+    <div style="display: block;">
+        <button onclick="inputData()" style="display: inline-block;">Input Data</button>
+        <button onclick="loadSave()" style="display: inline;">Load Previous Data</button>
+        <p id="currentZ" style="display: inline-block;">Current Z: 0</p>
+    </div>
+
+    <br>
+    <hr>
+    <br> 
+
+    <label for="nodeName">Node Name (unique + case sensitive)</label>
+    <input type="text" id="nodeName" name="nodeName" placeholder="ex: n1">
+
+    <br>
+    <hr>
+    <br>
+
+    <label for="connectedNodes">Connected Nodes (case sensitive)</label>
+    <input type="text" id="connectedNodes" name="connectedNodes" placeholder="ex: n2, n3">
+    <label for="location">Location of Node (coordinates)</label>
+    <input type="text" id="location" name="location" placeholder="ex: 150, 200">
+    <button onclick="generate(undefined, undefined, undefined)">Generate</button>
+    <button onclick="removeNode()">Remove</button>
+
+    <hr>
+
+    <label for="addConn">Add Connected Nodes (case sensitive)</label>
+    <input type="text" id="addConn" name="addConn" placeholder="ex: n2, n3">
+    <button onclick="addConn()">Add Connected Nodes</button>
+
+    <hr>
+
+    <label for="removeConn">Remove Connected Nodes (case sensitive)</label>
+    <input type="text" id="removeConn" name=removeConn placeholder="ex: n2, n3">
+    <button onclick="removeConn()">Remove Connected Nodes</button>
+
+    <hr>
+
+    <p id="graphOutput"> - Graph outputs here - </p>
+    <p id="locationsOutput"> - Location outputs here - </p>
+
+    <br>
+    <hr>
+    <br>
+
+    <p>Only process distances after all referenced node values, such as those in the connected nodes field, have been declared themselves. Any undefined nodes will cause errors.</p>
+    <br>
+    <button onclick="processDistances()">Process Distances</button>
+    <br>
+    <p id="distancesOutput"> - Distances output here - </p>
+
+    <br>
+    <hr>
+    <br>
+
+    <div style="display: block;">
+        <button onclick="render()" style="display: inline-block;">Render</button>
+        <button onclick="save()" style="display: inline-block;">Save</button>
+    </div>
+    <br>
+    <p id="saveOutput" style="width: 50vw;"> - Copyable map outputs here - </p>   
+    
+    <canvas width="600" height="600" id="canvas" style="background-color: gray; position: absolute; right: 5vw; top: 1vh;"></canvas>
+
+    <script>
+        let canvas = document.getElementById('canvas')
+        let ctx = canvas.getContext('2d')
+
+        let nodeSize = 10
+        let dragPlace = false
+        let roundTen = false
+        let currentZ = 0
+
+        let offsetX = 0
+        let offsetY = 0
+
+        let graph = {
+        }
+        let locations = {
+        }
+
+        function generate(nName, cNodes, loc) {
+            try {
+                let nodeName
+                let connectedNodes
+                let location
+                if (!nName || !cNodes || !loc) {
+                    nodeName = document.getElementById('nodeName').value
+                    connectedNodes = (document.getElementById('connectedNodes').value).split(", ")
+                    location = (document.getElementById('location').value).split(", ")
+                    for (var x = 0; x < location.length; x++) {
+                        location[x] = parseFloat(location[x])
+                    }
+                } else {
+                    nodeName = nName
+                    connectedNodes = cNodes
+                    location = loc
+                }
+                if (nodeName === "" || location.length < 2) {
+                    return alert("Invalid parameters.")
+                }
+                if (location.length < 3) {
+                    location[2] = currentZ
+                }
+                graph[nodeName] = {}
+                for (var x = 0; x < connectedNodes.length; x++) {
+                    let selected = connectedNodes[x]
+                    graph[nodeName][selected] = 0
+                    if (graph[selected]) {
+                        if (!graph[selected][nodeName]) {
+                            graph[selected][nodeName] = 0
+                        }
+                    }
+                }
+                locations[nodeName] = location
+
+                render()
+                displayInformation()
+            } catch (error) {
+                alert(error)
+            }
+        }
+
+        function removeNode() {
+            let nodeName = document.getElementById('nodeName').value
+            let connectedNodes
+            if (graph[nodeName]) {
+                connectedNodes = Object.keys(graph[nodeName])
+                for (var x = 0; x < connectedNodes.length; x++) {
+                    let selected = connectedNodes[x]
+                    delete graph[selected][nodeName]
+                }
+            }
+            delete graph[nodeName]
+            delete locations[nodeName]
+
+            render()
+            displayInformation()
+        }
+
+        function processDistances() {
+            let keys = Object.keys(graph)
+            for (var x = 0; x < keys.length; x++) {
+                let node = keys[x]
+                let connectedKeys = Object.keys(graph[node])
+                for (var y = 0; y < connectedKeys.length; y++) {
+                    let connNode = connectedKeys[y]
+                    if (graph[connNode]) {
+                        graph[node][connNode] = parseFloat(Math.sqrt((locations[node][0] - locations[connNode][0])**2 + (locations[node][1] - locations[connNode][1])**2).toFixed(2))
+                    } else {
+                        graph[node][connNode] = undefined
+                    }
+                }
+            }
+
+            displayInformation()
+        }
+
+        function addConn() {
+            let nodeName = document.getElementById('nodeName').value
+            let connectedNodes = (document.getElementById('addConn').value).split(", ")
+
+            for (var x = 0; x < connectedNodes.length; x++) {
+                let selected = connectedNodes[x]
+                
+                graph[nodeName][selected] = 0
+
+                if (graph[selected]) {
+                    if (!graph[selected][nodeName]) {
+                        graph[selected][nodeName] = 0
+                    }
+                }
+            }
+
+            render()
+            displayInformation()
+        }
+
+        function removeConn() {
+            let nodeName = document.getElementById('nodeName').value
+            let connectedNodes = (document.getElementById('removeConn').value).split(", ")
+
+            for (var x = 0; x < connectedNodes.length; x++) {
+                let selected = connectedNodes[x]
+                
+                delete graph[nodeName][selected]
+
+                if (graph[selected]) {
+                    delete graph[selected][nodeName]
+                }
+            }
+
+            render()
+            displayInformation()
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+            let keys = Object.keys(locations)
+            for (var key = 0; key < keys.length; key++) {
+                let node = keys[key]
+                if (locations[node][2] === currentZ) {
+                    let connectedKeys = Object.keys(graph[node])
+                    for (var y = 0; y < connectedKeys.length; y++) {
+                        let connNode = connectedKeys[y]
+                        if (graph[connNode]) {
+                            ctx.strokeStyle = "lightblue"
+                            ctx.beginPath()
+                            ctx.moveTo(locations[node][0] + nodeSize / 2 + offsetX, locations[node][1] + nodeSize / 2 + offsetY)
+                            ctx.lineTo(locations[connNode][0] + nodeSize / 2 + offsetX, locations[connNode][1] + nodeSize / 2 + offsetY)
+                            ctx.stroke()
+                        }
+                    }
+                    ctx.fillStyle = "lightgray"
+                    ctx.fillRect(locations[node][0] + offsetX, locations[node][1] + offsetY, nodeSize, nodeSize)
+                    ctx.fillStyle = "black"
+                    ctx.fillText(node, locations[node][0] + offsetX, locations[node][1] + nodeSize + offsetY)
+                }    
+            }
+        }
+
+        function inputData() {
+            let input = prompt("Paste data in here.")
+            graph = JSON.parse(input.split("###")[0])
+            locations = JSON.parse(input.split("###")[1])
+            displayInformation()
+            render()
+        }
+
+        function save() {
+            document.getElementById('saveOutput').innerHTML = JSON.stringify(graph) + "###" + JSON.stringify(locations)
+        }
+
+        function unloadSave() {
+            if (JSON.stringify(graph) !== "{}") {
+                localStorage.setItem("savedMap", JSON.stringify(graph) + "###" + JSON.stringify(locations))
+            }
+        }
+
+        function loadSave() {
+            if (confirm("Do you want to load your previous save?")) {
+                    if (localStorage.getItem("savedMap")) {
+                    let input = localStorage.getItem("savedMap")
+                    graph = JSON.parse(input.split("###")[0])
+                    locations = JSON.parse(input.split("###")[1])
+                    displayInformation()
+                    render()
+                } else {
+                    return
+                }
+            }
+        }
+
+        function displayInformation() {
+            document.getElementById('graphOutput').innerHTML = JSON.stringify(graph).split('},').join("}, <br>")
+            document.getElementById('locationsOutput').innerHTML = JSON.stringify(locations).split('],').join("], <br>")
+            document.getElementById('distancesOutput').innerHTML = JSON.stringify(graph).split('},').join("}, <br>")
+            document.getElementById('currentZ').innerHTML = "Current Z: " + currentZ
+        }
+
+        function keyPressed(e) {
+            if (e.key == "Shift") {
+                dragPlace = !dragPlace
+                if (dragPlace) {
+                    canvas.addEventListener('mousedown', nodePlaceDown)
+                    canvas.addEventListener('mouseup', nodePlaceUp)
+                } else {
+                    canvas.removeEventListener('mousedown', nodePlaceDown)
+                    canvas.removeEventListener('mouseup', nodePlaceUp)
+                }
+            } else if (e.key == "Alt") {
+                roundTen = !roundTen
+            } else if (e.key == "-") {
+                currentZ -= 1
+                render()
+            } else if (e.key == "=") {
+                currentZ += 1
+                render()
+            } else if (e.key == "ArrowUp") {
+                offsetY += 10
+                render()
+            } else if (e.key == "ArrowDown") {
+                offsetY -= 10
+                render()
+            } else if (e.key == "ArrowLeft") {
+                offsetX += 10
+                render()
+            } else if (e.key == "ArrowRight") {
+                offsetX -= 10
+                render()
+            }
+
+            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+                e.preventDefault()
+            }
+            displayInformation()
+        }
+
+        let location1
+        let location2
+
+        function nodePlaceDown(e) {
+            if (!roundTen) {
+                location1 = [e.offsetX, e.offsetY, currentZ]
+            } else {
+                location1 = [Math.round(e.offsetX / 10) * 10, Math.round(e.offsetY / 10) * 10, currentZ]
+            }
+        }
+
+        function nodePlaceUp(e) {
+            if (!roundTen) {
+                location2 = [e.offsetX, e.offsetY, currentZ]
+            } else {
+                location2 = [Math.round(e.offsetX / 10) * 10, Math.round(e.offsetY / 10) * 10, currentZ]
+            }
+            let name1 = prompt("Name of node 1")
+            let name2 = prompt("Name of node 2")
+            generate(name1, [name2], location1)
+            generate(name2, [name1], location2)
+        }
+
+        document.body.addEventListener('keydown', keyPressed)
+    </script>
+</body>
+</html>

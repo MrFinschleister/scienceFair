@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            margin: 0;
+            padding: none;
+            background-color: rgb(28, 42, 42);
+            display: grid;
+            grid-template-rows: 100vh;
+            grid-template-columns: 100vw;
+        }
+
+        .modeButton {
+            width: 5vw;
+            height: 5vw;
+            border-radius: 1vh;
+            position: absolute;
+            font-size: 10px;
+            background-color: rgb(69, 86, 86);
+            border: 1px grey solid;
+            color: lightgrey;
+        }
+
+        div {
+            position: absolute;
+            border-radius: 1vh;
+        }
+
+        canvas {
+            position: absolute;
+            border-radius: 1vh;
+        }
+
+        label {
+            width: 11vw;
+            color: rgb(88, 88, 88);
+            display: block;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+        }
+
+        p {
+            width: 11vw;
+            color: rgb(88, 88, 88);
+            display: block;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+        }
+
+        input {
+            width: 10vw;
+            color: rgb(88, 88, 88);
+            display: block;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+        }
+    </style>
+</head>
+<body onbeforeunload="unloadSave()">
+    <div style="width: 18vw; height: calc(100vh - 2vw); left: 1vw; align-self: center; background-color: rgb(14, 20, 20);" id="inputsDiv">
+        <div style="top: 16vw; left: 3vw;">
+            <label for="nodeName">Node Name</label>
+            <input type="text" id="nodeName" name="nodeName" placeholder="ex: n1">
+        </div>
+        <div style="top: 20vw; left: 3vw; display: inline;" id="createNodeDiv">
+            <label for="connectedNodes">Connected Nodes</label>
+            <input type="text" id="connectedNodes" name="connectedNodes" placeholder="ex: n2, n3">
+            <label for="location">Node Location (x, y, z)</label>
+            <input type="text" id="location" name="location" placeholder="ex: 150, 200, 0">
+            <button onclick="generate(undefined, undefined, undefined)">Generate</button>
+            <button onclick="removeNode()">Remove</button>
+        </div>
+        <div style="top: 20vw; left: 3vw; display: none" id="dragCreateNodeDiv">
+            
+        </div>
+        <div style="top: 20vw; left: 3vw; display: none;" id="addConnectedNodesDiv">
+            <label for="addConn">Add Connected Nodes</label>
+            <input type="text" id="addConn" name="addConn" placeholder="ex: n2, n3">
+            <button onclick="addConn()">Add Connected</button>
+        </div>
+        <div style="top: 20vw; left: 3vw; display: none;" id="removeConnectedNodesDiv">
+            <label for="removeConn">Remove Connected Nodes</label>
+            <input type="text" id="removeConn" name=removeConn placeholder="ex: n2, n3">
+            <button onclick="removeConn()">Remove Connected</button>
+        </div>
+        <div style="top: 33vw; margin-left: 3vw; position: relative;">
+            <button onclick="processDistances()">Process Distances</button>
+        </div>
+    </div>
+
+    <button onclick="changeMode('createNodeDiv')" class="modeButton" style="left: 4vw; top: 4vw;">Create Node</button>
+    <button onclick="changeMode('dragCreateNodeDiv')"  class="modeButton"  style="left: 11vw; top: 4vw;">this one don't work ;-;</button>
+    <button onclick="changeMode('addConnectedNodesDiv')"  class="modeButton"  style="left: 4vw; top: 11vw;">Add Connected</button>
+    <button onclick="changeMode('removeConnectedNodesDiv')"  class="modeButton"  style="left: 11vw; top: 11vw;">Remove Connected</button>
+
+    <canvas width="600" height="600" style="width: 50vw; height: calc(100vh - 2vw); justify-self: center; align-self: center; background-color: rgb(14, 20, 20)" id="canvas"></canvas>
+
+    <div style="width: 18vw; height: calc(100vh - 2vw); right: 1vw; align-self: center; background-color: rgb(14, 20, 20);">
+        <div style="text-align: center; position: relative; top: 1vw;">
+            <button onclick="inputData()">Input</button>
+            <button onclick="loadSave()">Load Previous</button>
+        </div>
+        <div style="width: 12vw; height: calc(50vh - 5vw); left: 3vw; top: 3vw; overflow-y: scroll;">
+            <p id="currentZ">Current Z: 0</p>
+            <p id="graphOutput">{}</p>
+            <p id="locationsOutput">{}</p>
+            <p id="distancesOutput">{}</p>
+        </div>
+        <div  style="top: calc(50vh - 1vw); left: 3vw; position: absolute; width: 12vw; text-align: center;">
+            <button onclick="save()">Save</button>
+        </div>
+        <div style="width: 12vw; height: calc(50vh - 5vw); left: 3vw; top: calc(50vh + 1vw); overflow-y: scroll;">
+            <p id="saveOutput"></p>
+        </div>
+    </div>
+
+    <script>
+        let canvas = document.getElementById('canvas')
+        let ctx = canvas.getContext('2d')
+        canvas.width = window.innerWidth * 0.5
+        canvas.height = window.innerWidth * 0.42
+
+
+        let nodeSize = 10
+        let dragPlace = false
+        let roundTen = false
+        let currentZ = 0
+
+        let offsetX = 0
+        let offsetY = 0
+
+        let graph = {
+        }
+        let locations = {
+        }
+
+        function generate(nName, cNodes, loc) {
+            try {
+                let nodeName
+                let connectedNodes
+                let location
+                if (!nName || !cNodes || !loc) {
+                    nodeName = document.getElementById('nodeName').value
+                    connectedNodes = (document.getElementById('connectedNodes').value).split(", ")
+                    location = (document.getElementById('location').value).split(", ")
+                    for (var x = 0; x < location.length; x++) {
+                        location[x] = parseFloat(location[x])
+                    }
+                } else {
+                    nodeName = nName
+                    connectedNodes = cNodes
+                    location = loc
+                }
+                if (nodeName === "" || location.length < 2) {
+                    return alert("Invalid parameters.")
+                }
+                if (location.length < 3) {
+                    location[2] = currentZ
+                }
+                graph[nodeName] = {}
+                for (var x = 0; x < connectedNodes.length; x++) {
+                    let selected = connectedNodes[x]
+                    graph[nodeName][selected] = 0
+                    if (graph[selected]) {
+                        if (!graph[selected][nodeName]) {
+                            graph[selected][nodeName] = 0
+                        }
+                    }
+                }
+                locations[nodeName] = location
+
+                render()
+                displayInformation()
+            } catch (error) {
+                alert(error)
+            }
+        }
+
+        function removeNode() {
+            let nodeName = document.getElementById('nodeName').value
+            let connectedNodes
+            if (graph[nodeName]) {
+                connectedNodes = Object.keys(graph[nodeName])
+                for (var x = 0; x < connectedNodes.length; x++) {
+                    let selected = connectedNodes[x]
+                    delete graph[selected][nodeName]
+                }
+            }
+            delete graph[nodeName]
+            delete locations[nodeName]
+
+            render()
+            displayInformation()
+        }
+
+        function processDistances() {
+            let keys = Object.keys(graph)
+            for (var x = 0; x < keys.length; x++) {
+                let node = keys[x]
+                let connectedKeys = Object.keys(graph[node])
+                for (var y = 0; y < connectedKeys.length; y++) {
+                    let connNode = connectedKeys[y]
+                    if (graph[connNode]) {
+                        graph[node][connNode] = parseFloat(Math.sqrt((locations[node][0] - locations[connNode][0])**2 + (locations[node][1] - locations[connNode][1])**2).toFixed(2))
+                    } else {
+                        graph[node][connNode] = undefined
+                    }
+                }
+            }
+
+            displayInformation()
+        }
+
+        function addConn() {
+            let nodeName = document.getElementById('nodeName').value
+            let connectedNodes = (document.getElementById('addConn').value).split(", ")
+
+            for (var x = 0; x < connectedNodes.length; x++) {
+                let selected = connectedNodes[x]
+                
+                graph[nodeName][selected] = 0
+
+                if (graph[selected]) {
+                    if (!graph[selected][nodeName]) {
+                        graph[selected][nodeName] = 0
+                    }
+                }
+            }
+
+            render()
+            displayInformation()
+        }
+
+        function removeConn() {
+            let nodeName = document.getElementById('nodeName').value
+            let connectedNodes = (document.getElementById('removeConn').value).split(", ")
+
+            for (var x = 0; x < connectedNodes.length; x++) {
+                let selected = connectedNodes[x]
+                
+                delete graph[nodeName][selected]
+
+                if (graph[selected]) {
+                    delete graph[selected][nodeName]
+                }
+            }
+
+            render()
+            displayInformation()
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+            let keys = Object.keys(locations)
+            for (var key = 0; key < keys.length; key++) {
+                let node = keys[key]
+                if (locations[node][2] === currentZ) {
+                    let connectedKeys = Object.keys(graph[node])
+                    for (var y = 0; y < connectedKeys.length; y++) {
+                        let connNode = connectedKeys[y]
+                        if (graph[connNode]) {
+                            ctx.strokeStyle = "lightblue"
+                            ctx.beginPath()
+                            ctx.moveTo(locations[node][0] + nodeSize / 2 + offsetX, locations[node][1] + nodeSize / 2 + offsetY)
+                            ctx.lineTo(locations[connNode][0] + nodeSize / 2 + offsetX, locations[connNode][1] + nodeSize / 2 + offsetY)
+                            ctx.stroke()
+                        }
+                    }
+                    ctx.fillStyle = "lightgray"
+                    ctx.fillRect(locations[node][0] + offsetX, locations[node][1] + offsetY, nodeSize, nodeSize)
+                    ctx.font = "bold 12px serif"
+                    ctx.strokeSyle = "black"
+                    ctx.fillStyle = "white"
+                    ctx.fillText(node, locations[node][0] + offsetX, locations[node][1] - (nodeSize / 5) + offsetY)
+                    ctx.fillStyle = "black"
+                }    
+            }
+        }
+
+        function inputData() {
+            let input = prompt("Paste data in here.")
+            graph = JSON.parse(input.split("###")[0])
+            locations = JSON.parse(input.split("###")[1])
+            displayInformation()
+            render()
+        }
+
+        function save() {
+            document.getElementById('saveOutput').innerHTML = JSON.stringify(graph) + "###" + JSON.stringify(locations)
+        }
+
+        function unloadSave() {
+            if (JSON.stringify(graph) !== "{}") {
+                localStorage.setItem("savedMap", JSON.stringify(graph) + "###" + JSON.stringify(locations))
+            }
+        }
+
+        function loadSave() {
+            if (confirm("Do you want to load your previous save?")) {
+                    if (localStorage.getItem("savedMap")) {
+                    let input = localStorage.getItem("savedMap")
+                    graph = JSON.parse(input.split("###")[0])
+                    locations = JSON.parse(input.split("###")[1])
+                    displayInformation()
+                    render()
+                } else {
+                    return
+                }
+            }
+        }
+
+        function displayInformation() {
+            document.getElementById('graphOutput').innerHTML = JSON.stringify(graph).split('},').join("}, <br>")
+            document.getElementById('locationsOutput').innerHTML = JSON.stringify(locations).split('],').join("], <br>")
+            document.getElementById('distancesOutput').innerHTML = JSON.stringify(graph).split('},').join("}, <br>")
+            document.getElementById('currentZ').innerHTML = "Current Z: " + currentZ
+        }
+
+        function keyPressed(e) {
+            if (e.target == document.body) {
+                if (e.key == "Shift") {
+                    dragPlace = !dragPlace
+                    if (dragPlace) {
+                        canvas.addEventListener('mousedown', nodePlaceDown)
+                        canvas.addEventListener('mouseup', nodePlaceUp)
+                    } else {
+                        canvas.removeEventListener('mousedown', nodePlaceDown)
+                        canvas.removeEventListener('mouseup', nodePlaceUp)
+                    }
+                } else if (e.key == "Alt") {
+                    roundTen = !roundTen
+                } else if (e.key == "-") {
+                    currentZ -= 1
+                    render()
+                } else if (e.key == "=") {
+                    currentZ += 1
+                    render()
+                } else if (e.key == "ArrowUp") {
+                    offsetY += 10
+                    render()
+                } else if (e.key == "ArrowDown") {
+                    offsetY -= 10
+                    render()
+                } else if (e.key == "ArrowLeft") {
+                    offsetX += 10
+                    render()
+                } else if (e.key == "ArrowRight") {
+                    offsetX -= 10
+                    render()
+                }
+
+                if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+                    e.preventDefault()
+                }
+                displayInformation()
+            }
+        }
+
+        let location1
+        let location2
+
+        function nodePlaceDown(e) {
+            if (!roundTen) {
+                location1 = [e.offsetX, e.offsetY, currentZ]
+            } else {
+                location1 = [Math.round(e.offsetX / 10) * 10, Math.round(e.offsetY / 10) * 10, currentZ]
+            }
+        }
+
+        function nodePlaceUp(e) {
+            if (!roundTen) {
+                location2 = [e.offsetX, e.offsetY, currentZ]
+            } else {
+                location2 = [Math.round(e.offsetX / 10) * 10, Math.round(e.offsetY / 10) * 10, currentZ]
+            }
+            let name1 = prompt("Name of node 1")
+            let name2 = prompt("Name of node 2")
+            generate(name1, [name2], location1)
+            generate(name2, [name1], location2)
+        }
+
+        let currentMode = 'createNodeDiv'
+        
+        function changeMode(mode) {
+            document.getElementById(currentMode).style.display = "none"
+            document.getElementById(mode).style.display = "inline"
+            currentMode = mode
+        }
+
+        document.body.addEventListener('keydown', keyPressed)
+    </script>
+</body>
+</html>

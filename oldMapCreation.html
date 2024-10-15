@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            margin: 0;
+            padding: none;
+        }
+        input {
+            width: 25vw;
+            display: block;
+            margin: 1vh;
+        }
+        button {
+            display: block;
+            margin: 1vh;
+        }
+        p {
+            display: block; 
+            margin: 1vh;
+            width: 25vw;
+        }
+    </style>
+</head>
+<body onbeforeunload="unloadSave()" onload="loadSave()">
+    <button onclick="inputData()" style="margin: 1vh;">Input Data</button>
+
+    <input type="text" id="nodeName" placeholder="Node Name" value="n1">
+    <input type="text" id="connectedNodes" placeholder="Connected Nodes - n1, n2, n3, etc. - (comma + space REQUIRED between values)" value="n2, n3">
+    <input type="text" id="location" placeholder="Location - x, y - (comma + space REQUIRED between values)" value="50, 50">
+
+    <button onclick="generate()">Create Node</button>
+    <p id="graphOutput">Graph output returns here.</p>
+    <p id="locationsOutput">Locations output returns here.</p>
+
+    <button onclick="processDistances()">Process Distances</button>
+    <p style="width: 25vw;">Only process distances after all referenced node values, such as those in the connected nodes field, have been declared themselves. Any undefined nodes will cause errors.</p>
+    <p id="distancesOutput"></p>
+
+    <button onclick="render()">Render</button>
+    <br>
+    <button onclick="save()">Save</button>
+    <p id="saveOutput" style="width: 50vw;"></p>   
+    <canvas width="600" height="600" id="canvas" style="background-color: gray; position: absolute; right: 5vw; top: 0;"></canvas>
+
+    <script>
+        let canvas = document.getElementById('canvas')
+        let ctx = canvas.getContext('2d')
+        let nodeSize = 10
+
+        let graph = {
+        }
+        let locations = {
+        }
+
+        function generate() {
+            try {
+                let nodeName = document.getElementById('nodeName').value
+                let connectedNodes = (document.getElementById('connectedNodes').value).split(", ")
+                let location = (document.getElementById('location').value).split(", ")
+                for (var x = 0; x < location.length; x++) {
+                    location[x] = parseFloat(location[x])
+                }
+                if (nodeName === "" || location.length < 2) {
+                    return alert("Invalid parameters.")
+                }
+                graph[nodeName] = {}
+                for (var x = 0; x < connectedNodes.length; x++) {
+                    let selected = connectedNodes[x]
+                    graph[nodeName][selected] = 0
+                    if (graph[selected]) {
+                        if (!graph[selected][nodeName]) {
+                            graph[selected][nodeName] = 0
+                        }
+                    }
+                }
+                locations[nodeName] = location
+                document.getElementById('graphOutput').innerHTML = JSON.stringify(graph).split('},').join("}, <br>")
+                document.getElementById('locationsOutput').innerHTML = JSON.stringify(locations).split('],').join("], <br>")
+            } catch (error) {
+                alert(error)
+            }
+        }
+
+        function processDistances() {
+            let keys = Object.keys(graph)
+            for (var x = 0; x < keys.length; x++) {
+                let node = keys[x]
+                let connectedKeys = Object.keys(graph[node])
+                for (var y = 0; y < connectedKeys.length; y++) {
+                    let connNode = connectedKeys[y]
+                    graph[node][connNode] = parseFloat(Math.sqrt((locations[node][0] - locations[connNode][0])**2 + (locations[node][1] - locations[connNode][1])**2).toFixed(2))
+                }
+            }
+            document.getElementById('distancesOutput').innerHTML = JSON.stringify(graph).split('},').join("}, <br>")
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+            let keys = Object.keys(locations)
+            for (var key = 0; key < keys.length; key++) {
+                let node = keys[key]
+                let connectedKeys = Object.keys(graph[node])
+                for (var y = 0; y < connectedKeys.length; y++) {
+                    let connNode = connectedKeys[y]
+                    ctx.strokeStyle = "lightblue"
+                    ctx.beginPath()
+                    ctx.moveTo(locations[node][0] + nodeSize / 2, locations[node][1] + nodeSize / 2)
+                    ctx.lineTo(locations[connNode][0] + nodeSize / 2, locations[connNode][1] + nodeSize / 2)
+                    ctx.stroke()
+                }
+                ctx.fillStyle = "lightgray"
+                ctx.fillRect(locations[node][0], locations[node][1], nodeSize, nodeSize)
+                ctx.fillStyle = "black"
+                ctx.fillText(node, locations[node][0], locations[node][1])
+            }
+        }
+
+        function inputData() {
+            let input = prompt("Paste data in here.")
+            graph = JSON.parse(input.split("###")[0])
+            locations = JSON.parse(input.split("###")[1])
+            render()
+        }
+
+        function save() {
+            document.getElementById('saveOutput').innerHTML = JSON.stringify(graph) + "###" + JSON.stringify(locations)
+        }
+
+        function unloadSave() {
+            localStorage.setItem("savedMap", JSON.stringify(graph) + "###" + JSON.stringify(locations))
+        }
+
+        function loadSave() {
+            if (confirm("Do you want to load your previous save?")) {
+                    if (localStorage.getItem("savedMap")) {
+                    let input = localStorage.getItem("savedMap")
+                    graph = JSON.parse(input.split("###")[0])
+                    locations = JSON.parse(input.split("###")[1])
+                    render()
+                } else {
+                    return
+                }
+            }
+        }
+    </script>
+</body>
+</html>
