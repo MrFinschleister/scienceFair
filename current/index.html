@@ -8,25 +8,82 @@
         body {
             margin: 0;
             padding: none;
-            overflow-y: hidden;
+            background-color: rgb(28, 42, 42);
+            display: grid;
+            grid-template-rows: 100vh;
+            grid-template-columns: 100vw;
         }
+
+        .modeButton {
+            width: 5vw;
+            height: 5vw;
+            border-radius: 1vh;
+            position: absolute;
+            font-size: 10px;
+            background-color: rgb(69, 86, 86);
+            border: 1px grey solid;
+            color: lightgrey;
+        }
+
+        div {
+            position: absolute;
+            border-radius: 1vh;
+        }
+
+        canvas {
+            position: absolute;
+            border-radius: 1vh;
+        }
+
+        label {
+            width: 11vw;
+            color: rgb(88, 88, 88);
+            display: block;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+        }
+
         p {
-            position: block;
-            margin: 1vh;
-            width: 50vw;
+            width: 11vw;
+            color: rgb(88, 88, 88);
+            display: block;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+        }
+
+        input {
+            width: 10vw;
+            color: rgb(88, 88, 88);
+            display: block;
+            margin-top: 1vh;
+            margin-bottom: 1vh;
         }
     </style>
 </head>
-<body onload="render()">
-    <button onclick="inputData()" style="margin: 1vh;">Input Data</button>
-    <div id="content" style="margin: 1vh;">
-        <input type="text" placeholder="Starting Location" id="startLocation">
-        <input type="text" placeholder="Ending Location" id="endLocation">
-        <button onclick="start()">Start</button>
-        <p id="routeOutput"></p>
-        <p id="routeOutputUncompressed" style="font-size: 10px;"></p>
-        <canvas width="600" height="600" id="canvas" style="background-color: gray; position: absolute; right: 5vw; top: 0;"></canvas>
+<body onbeforeunload="unloadSave()" onload="render()">
+    <div style="width: 18vw; height: calc(100vh - 2vw); left: 1vw; align-self: center; background-color: rgb(14, 20, 20);" id="inputsDiv">
+        <div style="top: 3vw; left: 3vw;">
+            <label for="startLocation">Starting Location</label>
+            <input type="text" id="startLocation" name="startLocation" placeholder="ex: n1">
+            <label for="endLocation">Ending Location</label>
+            <input type="text" id="endLocation" name="endLocation" placeholder="ex: n2">
+            <button onclick="start()">Start</button>
+        </div>
     </div>
+
+    <canvas width="600" height="600" style="width: 50vw; height: calc(100vh - 2vw); justify-self: center; align-self: center; background-color: rgb(14, 20, 20)" id="canvas"></canvas>
+
+    <div style="width: 18vw; height: calc(100vh - 2vw); right: 1vw; align-self: center; background-color: rgb(14, 20, 20);">
+        <div style="text-align: center; position: relative; top: 1vw;">
+            <button onclick="inputData()">Input</button>
+            <button onclick="loadSave()">Load Previous</button>
+        </div>
+        <div style="left: 3vw; top: 3vw;">
+            <p id="routeOutput">Route outputs here:</p>
+            <p id="routeOutputUncompressed">Uncompressed route outputs here: </p>
+        </div>
+    </div>
+
     <script>
         let canvas = document.getElementById('canvas')
         let ctx = canvas.getContext('2d')
@@ -162,48 +219,42 @@
             let finalRoute = routeGlobal
             let output = []
             
-            let chain = 0
-            let counter = 0
-            let xAxis = false
-            let yAxis = false
-            while (counter < finalRoute.length) {
-                let selected = finalRoute[counter]
-                let next = finalRoute[counter + 1]
+            for (var x = 0; x < finalRoute.length; x++) {
+                let previous = finalRoute[x - 1]
+                let selected = finalRoute[x]
+                let next = finalRoute[x + 1]
 
-                if (next != undefined) {
-                    if (locations[selected][0] === locations[next][0] && locations[selected][2] === locations[next][2] && xAxis && !yAxis) {
-                        chain++
-                    } else if (locations[selected][1] === locations[next][1] && locations[selected][2] === locations[next][2] && yAxis && !xAxis) {
-                        chain++
-                    } else {
-                        if (chain === 0) {
-                            if (locations[selected][0] === locations[next][0] && locations[selected][2] == locations[next][2]) {
-                                xAxis = true
-                            } else if (locations[selected][1] === locations[next][1] && locations[selected][2] == locations[next][2]) {
-                                yAxis = true
-                            }
-                        } else {
-                            chain = 0
-                            xAxis = false
-                            yAxis = false
-                            if (locations[selected][0] === locations[next][0] && locations[selected][2] === locations[next][2]) {
-                                xAxis = true
-                            } else if (locations[selected][1] === locations[next][1] && locations[selected][2] === locations[next][2]) {
-                                yAxis = true
-                            }
-                        }
-                        output.push(selected)
-                    }
-                } else {
-                    chain = 0
-                    xAxis = false
-                    yAxis = false
-                    output.push(selected)
+                function slope(startNode, endNode) {
+                    let x1 = locations[startNode][0]
+                    let x2 = locations[endNode][0]
+                    let y1 = locations[startNode][1]
+                    let y2 = locations[endNode][1]
+
+                    return (y2 - y1) / (x2 - x1)
                 }
-                counter++
+
+                if (previous == undefined || next == undefined) {
+                    output.push(selected)
+                } else {
+                    let currentSlope = slope(selected, next)
+                    let bigSlope = slope(previous, next)
+                    let movementZ = locations[previous][2] - locations[selected][2]
+
+                    if (currentSlope == bigSlope && movementZ == 0) {
+                    } else {
+                        if (movementZ >= 1) {
+                            output.push("Down " + Math.abs(movementZ) + " to " + selected)
+                            
+                        } else if (movementZ <= -1) {
+                            output.push("Up " + Math.abs(movementZ) + " to " + selected)
+                        } else {
+                            output.push(selected)
+                        }
+                    }
+                }
             }
 
-            document.getElementById('routeOutput').innerHTML = output.join(" -> ") + " || distance: " + finalDistance
+            document.getElementById('routeOutput').innerHTML = output.join(" </br> ") + " </br> --- </br> distance: " + finalDistance
             document.getElementById('routeOutputUncompressed').innerHTML = finalRoute.join(" -> ") + " || distance: " + finalDistance
         }
         
@@ -212,6 +263,25 @@
             graph = JSON.parse(input.split("###")[0])
             locations = JSON.parse(input.split("###")[1])
             render()
+        }
+
+        function unloadSave() {
+            if (JSON.stringify(graph) !== "{}") {
+                localStorage.setItem("savedMap", JSON.stringify(graph) + "###" + JSON.stringify(locations))
+            }
+        }
+
+        function loadSave() {
+            if (confirm("Do you want to load your previous save?")) {
+                    if (localStorage.getItem("savedMap")) {
+                    let input = localStorage.getItem("savedMap")
+                    graph = JSON.parse(input.split("###")[0])
+                    locations = JSON.parse(input.split("###")[1])
+                    render()
+                } else {
+                    return
+                }
+            }
         }
 
         function keyPressed(e) {

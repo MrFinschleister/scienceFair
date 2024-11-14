@@ -62,11 +62,21 @@
 </head>
 <body onbeforeunload="unloadSave()">
     <div style="width: 18vw; height: calc(100vh - 2vw); left: 1vw; align-self: center; background-color: rgb(14, 20, 20);" id="inputsDiv">
+        <div style="left: 3vw; top: 3vw;">
+            <button onclick="changeMode('createNodeDiv')" class="modeButton">Create Node</button>
+            <button onclick="changeMode('shiftNodeDiv')"  class="modeButton"  style="left: 7vw;">Shift Node</button>
+            <button onclick="changeMode('addConnectedNodesDiv')"  class="modeButton"  style="top: 7vw;">Add Connected</button>
+            <button onclick="changeMode('removeConnectedNodesDiv')"  class="modeButton"  style="left: 7vw; top: 7vw;">Remove Connected</button>
+        </div>
         <div style="top: 16vw; left: 3vw;">
             <label for="nodeName">Node Name</label>
             <input type="text" id="nodeName" name="nodeName" placeholder="ex: n1">
+            <div style="display: block; position: relative;">
+                <label for="doConverse" style="display: inline; margin: 0px; width: fit-content;">Do Converse</label>
+                <input type="checkbox" name="doConverse" style="display: inline; width: fit-content;" checked="true" id="doConverse">
+            </div> 
         </div>
-        <div style="top: 20vw; left: 3vw; display: inline;" id="createNodeDiv">
+        <div style="top: 22vw; left: 3vw; display: inline;" id="createNodeDiv">
             <label for="connectedNodes">Connected Nodes</label>
             <input type="text" id="connectedNodes" name="connectedNodes" placeholder="ex: n2, n3">
             <label for="location">Node Location (x, y, z)</label>
@@ -74,28 +84,29 @@
             <button onclick="generate(undefined, undefined, undefined)">Generate</button>
             <button onclick="removeNode()">Remove</button>
         </div>
-        <div style="top: 20vw; left: 3vw; display: none" id="dragCreateNodeDiv">
-            
+        <div style="top: 22vw; left: 3vw; display: none" id="shiftNodeDiv">
+            <label for="xShift">X Shift</label>
+            <input type="text" id="xShift" name="xShift" value="0">
+            <label for="yShift">Y Shift</label>
+            <input type="text" id="yShift" name="yShift" value="0">
+            <label for="zShift">Z Shift</label>
+            <input type="text" id="zShift" name="zShift" value="0">
+            <button onclick="shiftNode()">Shift Node</button>
         </div>
-        <div style="top: 20vw; left: 3vw; display: none;" id="addConnectedNodesDiv">
+        <div style="top: 22vw; left: 3vw; display: none;" id="addConnectedNodesDiv">
             <label for="addConn">Add Connected Nodes</label>
             <input type="text" id="addConn" name="addConn" placeholder="ex: n2, n3">
             <button onclick="addConn()">Add Connected</button>
         </div>
-        <div style="top: 20vw; left: 3vw; display: none;" id="removeConnectedNodesDiv">
+        <div style="top: 22vw; left: 3vw; display: none;" id="removeConnectedNodesDiv">
             <label for="removeConn">Remove Connected Nodes</label>
             <input type="text" id="removeConn" name=removeConn placeholder="ex: n2, n3">
             <button onclick="removeConn()">Remove Connected</button>
         </div>
-        <div style="top: 33vw; margin-left: 3vw; position: relative;">
+        <div style="top: 35vw; margin-left: 3vw; position: relative;">
             <button onclick="processDistances()">Process Distances</button>
         </div>
     </div>
-
-    <button onclick="changeMode('createNodeDiv')" class="modeButton" style="left: 4vw; top: 4vw;">Create Node</button>
-    <button onclick="changeMode('dragCreateNodeDiv')"  class="modeButton"  style="left: 11vw; top: 4vw;">this one don't work ;-;</button>
-    <button onclick="changeMode('addConnectedNodesDiv')"  class="modeButton"  style="left: 4vw; top: 11vw;">Add Connected</button>
-    <button onclick="changeMode('removeConnectedNodesDiv')"  class="modeButton"  style="left: 11vw; top: 11vw;">Remove Connected</button>
 
     <canvas width="600" height="600" style="width: 50vw; height: calc(100vh - 2vw); justify-self: center; align-self: center; background-color: rgb(14, 20, 20)" id="canvas"></canvas>
 
@@ -108,7 +119,6 @@
             <p id="currentZ">Current Z: 0</p>
             <p id="graphOutput">{}</p>
             <p id="locationsOutput">{}</p>
-            <p id="distancesOutput">{}</p>
         </div>
         <div  style="top: calc(50vh - 1vw); left: 3vw; position: absolute; width: 12vw; text-align: center;">
             <button onclick="save()">Save</button>
@@ -127,11 +137,14 @@
 
         let nodeSize = 10
         let dragPlace = false
-        let roundTen = false
+        let roundPlace = false
+        let roundTo = 20
         let currentZ = 0
+        let showGridlines = false
+        let gridlineSize = 10
 
-        let offsetX = 0
-        let offsetY = 0
+        let xOffset = 0
+        let yOffset = 0
 
         let graph = {
         }
@@ -166,7 +179,7 @@
                     let selected = connectedNodes[x]
                     graph[nodeName][selected] = 0
                     if (graph[selected]) {
-                        if (!graph[selected][nodeName]) {
+                        if (!graph[selected][nodeName] && document.getElementById('doConverse').checked == true) {
                             graph[selected][nodeName] = 0
                         }
                     }
@@ -215,6 +228,22 @@
             displayInformation()
         }
 
+        function shiftNode() {
+            let xShift = parseInt(document.getElementById('xShift').value)
+            let yShift = parseInt(document.getElementById('yShift').value)
+            let zShift = parseInt(document.getElementById('zShift').value)
+            let nodeName = document.getElementById('nodeName').value
+
+            if (locations[nodeName]) {
+                locations[nodeName][0] += xShift
+                locations[nodeName][1] += yShift
+                locations[nodeName][2] += zShift
+            }
+
+            render()
+            displayInformation()
+        }
+
         function addConn() {
             let nodeName = document.getElementById('nodeName').value
             let connectedNodes = (document.getElementById('addConn').value).split(", ")
@@ -225,7 +254,7 @@
                 graph[nodeName][selected] = 0
 
                 if (graph[selected]) {
-                    if (!graph[selected][nodeName]) {
+                    if (!graph[selected][nodeName] && document.getElementById('doConverse').checked == true) {
                         graph[selected][nodeName] = 0
                     }
                 }
@@ -244,7 +273,7 @@
                 
                 delete graph[nodeName][selected]
 
-                if (graph[selected]) {
+                if (graph[selected] && document.getElementById('doConverse').checked == true) {
                     delete graph[selected][nodeName]
                 }
             }
@@ -265,19 +294,38 @@
                         if (graph[connNode]) {
                             ctx.strokeStyle = "lightblue"
                             ctx.beginPath()
-                            ctx.moveTo(locations[node][0] + nodeSize / 2 + offsetX, locations[node][1] + nodeSize / 2 + offsetY)
-                            ctx.lineTo(locations[connNode][0] + nodeSize / 2 + offsetX, locations[connNode][1] + nodeSize / 2 + offsetY)
+                            ctx.moveTo(locations[node][0] + xOffset + nodeSize / 2, locations[node][1] + yOffset + nodeSize / 2)
+                            ctx.lineTo(locations[connNode][0] + xOffset + nodeSize / 2, locations[connNode][1] + yOffset + nodeSize / 2)
                             ctx.stroke()
                         }
                     }
                     ctx.fillStyle = "lightgray"
-                    ctx.fillRect(locations[node][0] + offsetX, locations[node][1] + offsetY, nodeSize, nodeSize)
+                    ctx.fillRect(locations[node][0] + xOffset, locations[node][1] + yOffset, nodeSize, nodeSize)
                     ctx.font = "bold 12px serif"
                     ctx.strokeSyle = "black"
                     ctx.fillStyle = "white"
-                    ctx.fillText(node, locations[node][0] + offsetX, locations[node][1] - (nodeSize / 5) + offsetY)
+                    ctx.fillText(node, locations[node][0] + xOffset, locations[node][1] - (nodeSize / 5) + yOffset)
                     ctx.fillStyle = "black"
                 }    
+            }
+
+            if (showGridlines) {
+                for (var x = 0; x < canvas.width / gridlineSize; x++) {
+                    ctx.strokeStyle = "darkgrey"
+                    ctx.lineWidth = "1"
+                    ctx.beginPath()
+                    ctx.moveTo((x + 1) * gridlineSize, 0)
+                    ctx.lineTo((x + 1) * gridlineSize, canvas.height)
+                    ctx.stroke() 
+                }
+                for (var y = 0; y < canvas.height / gridlineSize; y++) {
+                    ctx.strokeStyle = "darkgrey"
+                    ctx.lineWidth = "1"
+                    ctx.beginPath()
+                    ctx.moveTo(0, (y + 1) * gridlineSize)
+                    ctx.lineTo(canvas.width, (y + 1) * gridlineSize)
+                    ctx.stroke()
+                }
             }
         }
 
@@ -316,7 +364,6 @@
         function displayInformation() {
             document.getElementById('graphOutput').innerHTML = JSON.stringify(graph).split('},').join("}, <br>")
             document.getElementById('locationsOutput').innerHTML = JSON.stringify(locations).split('],').join("], <br>")
-            document.getElementById('distancesOutput').innerHTML = JSON.stringify(graph).split('},').join("}, <br>")
             document.getElementById('currentZ').innerHTML = "Current Z: " + currentZ
         }
 
@@ -332,7 +379,7 @@
                         canvas.removeEventListener('mouseup', nodePlaceUp)
                     }
                 } else if (e.key == "Alt") {
-                    roundTen = !roundTen
+                    roundPlace = !roundPlace
                 } else if (e.key == "-") {
                     currentZ -= 1
                     render()
@@ -340,16 +387,19 @@
                     currentZ += 1
                     render()
                 } else if (e.key == "ArrowUp") {
-                    offsetY += 10
+                    yOffset += 10
                     render()
                 } else if (e.key == "ArrowDown") {
-                    offsetY -= 10
+                    yOffset -= 10
                     render()
                 } else if (e.key == "ArrowLeft") {
-                    offsetX += 10
+                    xOffset += 10
                     render()
                 } else if (e.key == "ArrowRight") {
-                    offsetX -= 10
+                    xOffset -= 10
+                    render()
+                } else if (e.key == "Enter") {
+                    showGridlines = !showGridlines
                     render()
                 }
 
@@ -364,18 +414,18 @@
         let location2
 
         function nodePlaceDown(e) {
-            if (!roundTen) {
+            if (!roundPlace) {
                 location1 = [e.offsetX, e.offsetY, currentZ]
             } else {
-                location1 = [Math.round(e.offsetX / 10) * 10, Math.round(e.offsetY / 10) * 10, currentZ]
+                location1 = [Math.floor(e.offsetX / roundTo) * roundTo, Math.floor(e.offsetY / roundTo) * roundTo, currentZ]
             }
         }
 
         function nodePlaceUp(e) {
-            if (!roundTen) {
+            if (!roundPlace) {
                 location2 = [e.offsetX, e.offsetY, currentZ]
             } else {
-                location2 = [Math.round(e.offsetX / 10) * 10, Math.round(e.offsetY / 10) * 10, currentZ]
+                location2 = [Math.floor(e.offsetX / roundTo) * roundTo, Math.floor(e.offsetY / roundTo) * roundTo, currentZ]
             }
             let name1 = prompt("Name of node 1")
             let name2 = prompt("Name of node 2")
